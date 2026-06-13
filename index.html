@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✨ 我的博客</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --glass-bg: rgba(255, 255, 255, 0.22);
+    --glass-border: rgba(255, 255, 255, 0.5);
+    --highlight: rgba(255, 255, 255, 0.85);
+    --text: #1d1d1f;
+    --text-soft: rgba(29, 29, 31, 0.72);
+    --shadow: 0 8px 32px rgba(31, 38, 135, 0.2);
+    --shadow-strong: 0 25px 70px rgba(31, 38, 135, 0.32);
+    /* 鼠标坐标 - 由 JS 实时更新 */
+    --mx: 50%;
+    --my: 50%;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", "Microsoft YaHei", sans-serif;
+    color: var(--text);
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+    background: #0a0a1a;
+    cursor: none;
+  }
+
+  /* ===== 基础深色底 ===== */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: -3;
+    background: linear-gradient(135deg, #1a0b2e 0%, #16213e 50%, #0f3460 100%);
+  }
+
+  /* ===== 鼠标跟随的彩色 Blob 光晕 ===== */
+  .blob {
+    position: fixed;
+    width: 600px;
+    height: 600px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: -2;
+    filter: blur(80px);
+    opacity: 0.7;
+    transform: translate(-50%, -50%);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    will-change: transform;
+  }
+
+  .blob-1 {
+    background: radial-gradient(circle, #ff6ec7 0%, transparent 70%);
+    width: 500px;
+    height: 500px;
+    animation: blobMorph1 12s ease-in-out infinite;
+  }
+
+  .blob-2 {
+    background: radial-gradient(circle, #4facfe 0%, transparent 70%);
+    width: 700px;
+    height: 700px;
+    animation: blobMorph2 15s ease-in-out infinite;
+  }
+
+  .blob-3 {
+    background: radial-gradient(circle, #a18cd1 0%, transparent 70%);
+    width: 450px;
+    height: 450px;
+    animation: blobMorph3 18s ease-in-out infinite;
+  }
+
+  .blob-4 {
+    background: radial-gradient(circle, #84fab0 0%, transparent 70%);
+    width: 400px;
+    height: 400px;
+    animation: blobMorph4 20s ease-in-out infinite;
+  }
+
+  /* Blob 形态变形 */
+  @keyframes blobMorph1 {
+    0%, 100% { border-radius: 50% 50% 50% 50% / 50% 50% 50% 50%; }
+    33% { border-radius: 60% 40% 55% 45% / 50% 60% 40% 50%; }
+    66% { border-radius: 40% 60% 45% 55% / 60% 50% 50% 40%; }
+  }
+  @keyframes blobMorph2 {
+    0%, 100% { border-radius: 40% 60% 60% 40% / 50% 50% 50% 50%; }
+    50% { border-radius: 60% 40% 40% 60% / 40% 60% 40% 60%; }
+  }
+  @keyframes blobMorph3 {
+    0%, 100% { border-radius: 55% 45% 40% 60% / 55% 45% 60% 40%; }
+    50% { border-radius: 45% 55% 60% 40% / 45% 55% 40% 60%; }
+  }
+  @keyframes blobMorph4 {
+    0%, 100% { border-radius: 50% 50% 40% 60% / 60% 40% 60% 40%; }
+    50% { border-radius: 60% 40% 50% 50% / 40% 60% 50% 50%; }
+  }
+
+  /* 噪点 */
+  .noise {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    opacity: 0.35;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.5'/></svg>");
+  }
+
+  /* ===== 自定义光标 ===== */
+  .cursor {
+    position: fixed;
+    width: 24px;
+    height: 24px;
+    border: 2px solid rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.3s, height 0.3s, border-color 0.3s, background 0.3s;
+    mix-blend-mode: difference;
+  }
+
+  .cursor.hovering {
+    width: 60px;
+    height: 60px;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.9);
+  }
+
+  .cursor-dot {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    background: white;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.15s ease;
+  }
+
+  /* ===== Liquid Glass 核心 ===== */
+  .glass {
+    position: relative;
+    background: var(--glass-bg);
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      var(--shadow),
+      inset 0 1px 0 0 var(--highlight),
+      inset 0 -1px 0 0 rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+    transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.4s ease;
+    transform-style: preserve-3d;
+  }
+
+  /* 顶部流光高光 */
+  .glass::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -50%;
+    right: -50%;
+    height: 50%;
+    background: linear-gradient(180deg,
+      rgba(255, 255, 255, 0.55) 0%,
+      rgba(255, 255, 255, 0.15) 35%,
+      transparent 100%);
+    border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+    pointer-events: none;
+    opacity: 0.7;
+    z-index: 1;
+  }
+
+  /* 边缘折射光 */
+  .glass::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg,
+      rgba(255, 255, 255, 0.85) 0%,
+      rgba(255, 255, 255, 0.1) 25%,
+      transparent 50%,
+      rgba(255, 255, 255, 0.1) 75%,
+      rgba(255, 255, 255, 0.6) 100%);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  /* 玻璃内高光 - 跟随鼠标 */
+  .glass .liquid-highlight {
+    position: absolute;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.5) 0%, transparent 60%);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    z-index: 0;
+    filter: blur(20px);
+  }
+
+  .glass:hover .liquid-highlight { opacity: 1; }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 24px;
+    position: relative;
+  }
+
+  /* ===== 导航栏 ===== */
+  header {
+    position: sticky;
+    top: 16px;
+    z-index: 100;
+    margin: 0 16px;
+  }
+
+  nav.glass {
+    border-radius: 20px;
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .logo {
+    font-size: 18px;
+    font-weight: 700;
+    color: white;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    letter-spacing: 0.3px;
+  }
+
+  .nav-links {
+    display: flex;
+    list-style: none;
+    gap: 4px;
+  }
+
+  .nav-links a {
+    color: white;
+    text-decoration: none;
+    padding: 8px 16px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  }
+
+  .nav-links a:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+  }
+
+  /* ===== Hero ===== */
+  .hero {
+    text-align: center;
+    padding: 100px 20px 60px;
+    color: white;
+  }
+
+  .hero-avatar {
+    width: 130px;
+    height: 130px;
+    margin: 0 auto 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 64px;
+    position: relative;
+    background: linear-gradient(135deg, #ff6ec7, #4facfe, #a18cd1, #84fab0);
+    background-size: 300% 300%;
+    animation: gradientSpin 8s ease infinite, float 5s ease-in-out infinite;
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.35),
+      inset 0 2px 6px rgba(255, 255, 255, 0.5);
+  }
+
+  @keyframes gradientSpin {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-14px) rotate(3deg); }
+  }
+
+  .hero h1 {
+    font-size: clamp(36px, 5vw, 52px);
+    font-weight: 800;
+    margin-bottom: 14px;
+    letter-spacing: -1px;
+    text-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+  }
+
+  .hero p {
+    font-size: 18px;
+    opacity: 0.92;
+    font-weight: 300;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ===== 章节 ===== */
+  section { padding: 30px 0; }
+
+  .section-title {
+    font-size: 28px;
+    font-weight: 700;
+    color: white;
+    margin: 40px 0 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .section-title::before {
+    content: "";
+    width: 4px;
+    height: 28px;
+    background: linear-gradient(180deg, #ff6ec7, #4facfe);
+    border-radius: 2px;
+    box-shadow: 0 0 14px rgba(255, 110, 199, 0.6);
+  }
+
+  /* ===== 卡片 ===== */
+  .articles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+    perspective: 1200px;
+  }
+
+  .card {
+    border-radius: 24px;
+    padding: 28px;
+    cursor: pointer;
+    will-change: transform;
+  }
+
+  /* 3D tilt - 由 JS 控制 transform */
+
+  .card-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: rgba(255, 255, 255, 0.4);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    color: var(--text);
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    position: relative;
+    z-index: 3;
+  }
+
+  .card-meta {
+    display: flex;
+    gap: 14px;
+    color: var(--text-soft);
+    font-size: 13px;
+    margin-bottom: 12px;
+    font-weight: 500;
+    position: relative;
+    z-index: 3;
+  }
+
+  .card h3 {
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 12px;
+    color: var(--text);
+    line-height: 1.4;
+    position: relative;
+    z-index: 3;
+  }
+
+  .card p {
+    color: var(--text-soft);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 18px;
+    position: relative;
+    z-index: 3;
+  }
+
+  .read-more {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+    font-weight: 600;
+    font-size: 14px;
+    text-decoration: none;
+    transition: gap 0.3s ease;
+    position: relative;
+    z-index: 3;
+  }
+
+  .card:hover .read-more { gap: 12px; }
+
+  /* ===== 关于 ===== */
+  .about-grid {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: 20px;
+    perspective: 1200px;
+  }
+
+  .about-card, .tags-card, .social-card {
+    border-radius: 24px;
+    padding: 32px;
+    will-change: transform;
+  }
+
+  .about-card h3, .tags-card h3, .social-card h3 {
+    font-size: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    position: relative;
+    z-index: 3;
+  }
+
+  .about-card p {
+    color: var(--text-soft);
+    line-height: 1.85;
+    font-size: 15px;
+    position: relative;
+    z-index: 3;
+  }
+
+  .tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    position: relative;
+    z-index: 3;
+  }
+
+  .tag {
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.3);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: var(--text);
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 500;
+    transition: all 0.3s ease;
+    cursor: pointer;
+  }
+
+  .tag:hover {
+    background: rgba(255, 255, 255, 0.6);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+  }
+
+  .socials {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    position: relative;
+    z-index: 3;
+  }
+
+  .social-btn {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-weight: 700;
+    font-size: 18px;
+    text-decoration: none;
+    transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+    background: rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .social-btn:hover {
+    transform: translateY(-4px) scale(1.1);
+    background: rgba(255, 255, 255, 0.5);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.25);
+  }
+
+  /* ===== 页脚 ===== */
+  footer {
+    text-align: center;
+    padding: 60px 20px 30px;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 14px;
+  }
+
+  footer p { margin: 4px 0; text-shadow: 0 1px 4px rgba(0, 0, 0, 0.3); }
+  footer .thanks { margin-top: 12px; font-size: 13px; opacity: 0.75; }
+
+  /* ===== 响应式 ===== */
+  @media (max-width: 768px) {
+    .nav-links { display: none; }
+    .about-grid { grid-template-columns: 1fr; }
+    .hero { padding: 70px 20px 40px; }
+    .hero-avatar { width: 100px; height: 100px; font-size: 52px; }
+    body { cursor: auto; }
+    .cursor, .cursor-dot { display: none; }
+  }
+
+  .fade-in {
+    opacity: 0;
+    transform: translateY(30px);
+    animation: fadeUp 0.9s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  @keyframes fadeUp {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in:nth-child(1) { animation-delay: 0.15s; }
+  .fade-in:nth-child(2) { animation-delay: 0.3s; }
+  .fade-in:nth-child(3) { animation-delay: 0.45s; }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+<div class="blob blob-4"></div>
+<div class="noise"></div>
+
+<div class="cursor"></div>
+<div class="cursor-dot"></div>
+
+<header>
+  <nav class="glass">
+    <div class="logo">✨ 我的博客</div>
+    <ul class="nav-links">
+      <li><a href="#home" data-hover>首页</a></li>
+      <li><a href="#articles" data-hover>文章</a></li>
+      <li><a href="#about" data-hover>关于</a></li>
+      <li><a href="#contact" data-hover>联系</a></li>
+    </ul>
+  </nav>
+</header>
+
+<section class="hero" id="home">
+  <div class="hero-avatar" data-hover>👨 💻</div>
+  <h1>欢迎来到我的博客</h1>
+  <p>分享技术、生活与思考的空间</p>
+</section>
+
+<section id="articles">
+  <div class="container">
+    <h2 class="section-title">📰 最新文章</h2>
+    <div class="articles">
+      <article class="glass card fade-in" data-tilt>
+        <div class="liquid-highlight"></div>
+        <span class="card-tag">🚀 技术</span>
+        <div class="card-meta">
+          <span>📅 2026年6月10日</span>
+          <span>⏱️ 5 分钟阅读</span>
+        </div>
+        <h3>探索现代 Web 开发的未来趋势</h3>
+        <p>随着技术的快速发展，Web 开发领域正在经历前所未有的变革。从 AI 辅助编程到新的前端框架，让我们一起探讨这些令人兴奋的技术趋势……</p>
+        <a href="#" class="read-more">阅读全文 →</a>
+      </article>
+
+      <article class="glass card fade-in" data-tilt>
+        <div class="liquid-highlight"></div>
+        <span class="card-tag">🎨 设计</span>
+        <div class="card-meta">
+          <span>📅 2026年6月8日</span>
+          <span>⏱️ 7 分钟阅读</span>
+        </div>
+        <h3>UI/UX 设计的最佳实践指南</h3>
+        <p>优秀的设计不仅仅是美观，更是用户体验的核心。本文将分享一些经过验证的设计原则和技巧，帮助你创造出更出色的用户界面……</p>
+        <a href="#" class="read-more">阅读全文 →</a>
+      </article>
+
+      <article class="glass card fade-in" data-tilt>
+        <div class="liquid-highlight"></div>
+        <span class="card-tag">💡 生活</span>
+        <div class="card-meta">
+          <span>📅 2026年6月5日</span>
+          <span>⏱️ 4 分钟阅读</span>
+        </div>
+        <h3>程序员的自我提升之路</h3>
+        <p>在技术快速迭代的今天，持续学习变得尤为重要。分享我个人的学习方法和成长心得，希望能给你带来一些启发……</p>
+        <a href="#" class="read-more">阅读全文 →</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section id="about">
+  <div class="container">
+    <h2 class="section-title">👤 关于</h2>
+    <div class="about-grid">
+      <div class="glass about-card" data-tilt>
+        <div class="liquid-highlight"></div>
+        <h3>关于我</h3>
+        <p>你好！我是一名热爱技术的开发者，喜欢探索新技术，分享学习心得。在这里，我会记录自己的成长历程，分享有价值的技术文章和生活感悟。</p>
+      </div>
+
+      <div>
+        <div class="glass tags-card" data-tilt style="margin-bottom:20px;">
+          <div class="liquid-highlight"></div>
+          <h3>🏷️ 标签云</h3>
+          <div class="tags">
+            <span class="tag">JavaScript</span>
+            <span class="tag">Python</span>
+            <span class="tag">React</span>
+            <span class="tag">Vue.js</span>
+            <span class="tag">CSS</span>
+            <span class="tag">Node.js</span>
+            <span class="tag">AI</span>
+            <span class="tag">设计</span>
+            <span class="tag">生活</span>
+          </div>
+        </div>
+
+        <div class="glass social-card" data-tilt id="contact">
+          <div class="liquid-highlight"></div>
+          <h3>🔗 关注我</h3>
+          <div class="socials">
+            <a href="#" class="social-btn" data-hover>G</a>
+            <a href="#" class="social-btn" data-hover>T</a>
+            <a href="#" class="social-btn" data-hover>L</a>
+            <a href="#" class="social-btn" data-hover>@</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <p>Made with ❤️ by 你的名字 | © 2026 All Rights Reserved</p>
+  <p class="thanks">感谢你的访问，期待与你交流！</p>
+</footer>
+
+<script>
+(function() {
+  const cursor = document.querySelector('.cursor');
+  const cursorDot = document.querySelector('.cursor-dot');
+  const blobs = document.querySelectorAll('.blob');
+  const tiltElements = document.querySelectorAll('[data-tilt]');
+  const hoverElements = document.querySelectorAll('[data-hover]');
+
+  let mouseX = window.innerWidth / 2;
+  let mouseY = window.innerHeight / 2;
+  let cursorX = mouseX, cursorY = mouseY;
+  let dotX = mouseX, dotY = mouseY;
+
+  // 主光标更新
+  document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    document.documentElement.style.setProperty('--mx', e.clientX + 'px');
+    document.documentElement.style.setProperty('--my', e.clientY + 'px');
+  });
+
+  // 平滑跟随动画
+  function animate() {
+    // 光标外环缓动
+    cursorX += (mouseX - cursorX) * 0.15;
+    cursorY += (mouseY - cursorY) * 0.15;
+    cursor.style.left = cursorX + 'px';
+    cursor.style.top = cursorY + 'px';
+
+    // 光标内点快速跟
+    dotX += (mouseX - dotX) * 0.5;
+    dotY += (mouseY - dotY) * 0.5;
+    cursorDot.style.left = dotX + 'px';
+    cursorDot.style.top = dotY + 'px';
+
+    // Blob 跟随,带不同延迟制造层次
+    blobs.forEach((blob, i) => {
+      const factor = (i + 1) * 0.08;
+      const bx = mouseX * factor + (window.innerWidth * (1 - factor)) / 2;
+      const by = mouseY * factor + (window.innerHeight * (1 - factor)) / 2;
+      blob.style.transform = `translate(${bx - 250}px, ${by - 250}px)`;
+    });
+
+    requestAnimationFrame(animate);
+  }
+  animate();
+
+  // 3D 倾斜 + 液体高光
+  tiltElements.forEach(el => {
+    const highlight = el.querySelector('.liquid-highlight');
+
+    el.addEventListener('mousemove', (e) => {
+      const rect = el.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const centerX = rect.width / 2;
+      const centerY = rect.height / 2;
+
+      // 倾斜角度 (最大 ±8度)
+      const rotateX = ((y - centerY) / centerY) * -8;
+      const rotateY = ((x - centerX) / centerX) * 8;
+
+      el.style.transform = `perspective(1000px) rotateX(${rotateX}deg) rotateY(${rotateY}deg) scale3d(1.02, 1.02, 1.02)`;
+
+      // 液体高光跟随
+      if (highlight) {
+        highlight.style.left = x + 'px';
+        highlight.style.top = y + 'px';
+      }
+    });
+
+    el.addEventListener('mouseleave', () => {
+      el.style.transform = 'perspective(1000px) rotateX(0) rotateY(0) scale3d(1, 1, 1)';
+    });
+  });
+
+  // 可悬停元素光标放大
+  hoverElements.forEach(el => {
+    el.addEventListener('mouseenter', () => cursor.classList.add('hovering'));
+    el.addEventListener('mouseleave', () => cursor.classList.remove('hovering'));
+  });
+})();
+</script>
+
+<script data-tabbit-widget-diagnostics="true">
+(function(){
+  if (window.__tabbitWidgetDiagnosticsInstalled) return;
+  window.__tabbitWidgetDiagnosticsInstalled = true;
+  window.__TABBIT_WIDGET_ERRORS__ = window.__TABBIT_WIDGET_ERRORS__ || [];
+  function emit(level, args) {
+    var payload = {
+      type: "tabbit_widget_diagnostics",
+      level: level,
+      message: Array.prototype.slice.call(args || []).map(function(item) {
+        if (item && item.stack) return item.stack;
+        if (typeof item === "string") return item;
+        try { return JSON.stringify(item); } catch (_) { return String(item); }
+      }).join(" "),
+      timestamp: Date.now()
+    };
+    window.__TABBIT_WIDGET_ERRORS__.push(payload);
+    try { window.parent && window.parent.postMessage(payload, "*"); } catch (_) {}
+  }
+  var originalError = console.error;
+  console.error = function() {
+    emit("error", arguments);
+    return originalError && originalError.apply(console, arguments);
+  };
+  window.addEventListener("error", function(event) {
+    emit("error", [event.message || "Script error", event.filename || "", event.lineno || ""]);
+  });
+  window.addEventListener("unhandledrejection", function(event) {
+    emit("unhandledrejection", [event.reason || "Unhandled promise rejection"]);
+  });
+})();
+</script></body>
+</html>
